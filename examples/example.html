@@ -384,13 +384,13 @@ require(easyr)
 require(forecast)
 begin()</code></pre>
 <pre><code>## Cleared variables from environment. 
-## Set workspace to [ C:/Users/Bryce/Documents/0-active/school/time-series/cv-fun ]. 
+## Set workspace to [ C:/Users/Bryce/Documents/0-active/school/time-series/cv-fun/examples ]. 
 ## Disabled scientific notation. 
 ## Loaded: [ magrittr, dplyr ].</code></pre>
 <pre class="r"><code># read data and remove your holdout.
 # data is from https://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
 # Luis M. Candanedo, Veronique Feldheim, Dominique Deramaix, Data driven prediction models of energy use of appliances in a low-energy house, Energy and Buildings, Volume 140, 1 April 2017, Pages 81-97, ISSN 0378-7788
-dt = read.any(&#39;daily.csv&#39;)
+dt = read.any(&#39;../data/daily.csv&#39;)
 test = tail(dt, 7)
 train = head(dt, nrow(dt) - 7)
 head(train)</code></pre>
@@ -446,7 +446,7 @@ models = list(
     )
 )</code></pre>
 <pre class="r"><code># read the function.
-suppressWarnings(source(&#39;cv-fn.R&#39;))
+suppressWarnings(source(&#39;../cv-fn.R&#39;, local = TRUE))
 
 # run the CV.
 cv = modelcv(
@@ -457,16 +457,9 @@ cv = modelcv(
     h = 7, # 1 week
     numcvs = 7 * 3, # 3 weeks
     runtypes = c(&#39;sliding&#39;, &#39;expanding&#39;),
-    numcores = 2,
+    numcores = 1,
     verbose = FALSE
 )</code></pre>
-<pre><code>## Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: 
-##      idt$model$fit(train = idt$train, train_xreg = idt$train_xreg, 
-##          ...)</code></pre>
-<pre><code>## Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: 
-##      idt$model$forecast(m = im, h = h, train = idt$train, train_xreg = idt$train_xreg, 
-##          ...)</code></pre>
-<pre><code>## Warning: &lt;anonymous&gt;: ... may be used in an incorrect context: &#39;idt$model$residuals(im, ...)&#39;</code></pre>
 <pre class="r"><code>head(cv$summary)</code></pre>
 <pre><code>## # A tibble: 6 x 9
 ## # Groups:   model, window [6]

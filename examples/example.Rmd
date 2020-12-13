@@ -16,7 +16,7 @@ begin()
 # read data and remove your holdout.
 # data is from https://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
 # Luis M. Candanedo, Veronique Feldheim, Dominique Deramaix, Data driven prediction models of energy use of appliances in a low-energy house, Energy and Buildings, Volume 140, 1 April 2017, Pages 81-97, ISSN 0378-7788
-dt = read.any('daily.csv')
+dt = read.any('../data/daily.csv')
 test = tail(dt, 7)
 train = head(dt, nrow(dt) - 7)
 head(train)
@@ -67,7 +67,7 @@ models = list(
 
 ```{r, message=FALSE}
 # read the function.
-suppressWarnings(source('cv-fn.R'))
+suppressWarnings(source('../cv-fn.R', local = TRUE))
 
 # run the CV.
 cv = modelcv(
@@ -78,7 +78,7 @@ cv = modelcv(
     h = 7, # 1 week
     numcvs = 7 * 3, # 3 weeks
     runtypes = c('sliding', 'expanding'),
-    numcores = 2,
+    numcores = 1,
     verbose = FALSE
 )
 ```
