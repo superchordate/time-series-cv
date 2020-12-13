@@ -62,4 +62,4 @@ modelcv = function(
 ){
 ```
 
-See an example at `example.R`.
+See an example at [example.R](https://github.com/superchordate/time-series-cv/blob/main/examples/example.R).
