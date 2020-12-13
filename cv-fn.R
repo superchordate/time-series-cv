@@ -27,8 +27,58 @@ modelcv = function(
     if(!is.null(numcvs) && windowsize + numcvs + h > length(y)) stop(glue('
        windowsize + numcvs + h ({windowsize} + {numcvs} + {h} = {windowsize + numcvs + h} exceeds number of observations ({length(y)})) 
     '))
+    
+    # set up the function to use at each iteration.
+    dofn = function(idt){
+        
+        #if(idt$train_from == 2274 && grepl('ARIMA', idt$model$name)) browser()
+        
+        # fill missing items.
+        h = length(idt$test)        
+        if(is.null(idt$model$forecast)) idt$model$forecast = function(m, h, ...){
+            forecast(m, h = h)$mean
+        }
+        if(is.null(idt$model$residuals)) idt$model$residuals = function(m) residuals(m)
+        if(is.null(idt$model$bic)) idt$model$bic = function(m) BIC(m)
+
+        # fit, forecast, residuals and bic can all fail. 
+        # run them separate so we can give a helpful error.
+        im = tryCatch({
+            idt$model$fit(y = idt$train, xreg = idt$xreg)
+        }, error = function(e) stop(glue('model$fit failed on [{idt$model$name}]: {e}')))
+        
+        iforecast = tryCatch({
+            as.numeric(idt$model$forecast(m = im, h = h, xreg = idt$xreg, y = idt$train, test_xreg = xreg[idt$test_from:idt$test_thru, ]))
+        }, error = function(e) stop(glue('model$forecast failed on [{idt$model$name}]: {e}')))
+        
+        iresiduals = tryCatch({
+            as.numeric(tail(idt$model$residuals(im), h))
+        }, error = function(e) stop(glue('model$residuals failed on [{idt$model$name}]: {e}')))
+        
+        ibic = tryCatch({
+            idt$model$bic(im)
+        }, error = function(e) stop(glue('model$bic failed on [{idt$model$name}]: {e}')))
+        if(length(ibic) == 0) stop(glue('model$bic failed on [{idt$model$name}]: BIC has length 0: {ibic}'))
+        
+        data.frame(
+            window = idt$windowtype,
+            model = idt$model$name,
+            train_from = idt$train_from,
+            train_thru = idt$train_thru,
+            test_from = idt$test_from,
+            test_thru = idt$test_thru,
+            bic = idt$model$bic(im), # more consinstenlty implemented than AICc,
+            forecast_horizon = 1:h,
+            forecasterr = iforecast - idt$test,
+            forecast = list(iforecast),
+            test = list(idt$test),
+            modelerr = iresiduals
+        )        
+        
+    }
 
     # build the list of CV info.
+    if(verbose) cat('\n Building test/train datasets.')
     dt = list()
     for(iwindowstart in iterateoverstarts){
 
@@ -75,41 +125,23 @@ modelcv = function(
         }
 
     }
-
-    # set up the function to use at each iteration.
-    dofn = function(idt){
-
-            im = idt$model$fit(y = idt$train, xreg = idt$xreg)
-            h = length(idt$test)
-
-            if(is.null(idt$model$forecast)) idt$model$forecast = function(m, h, ...) forecast(m, h)$mean
-            if(is.null(idt$model$residuals)) idt$model$residuals = function(m) residuals(m)
-            if(is.null(idt$model$bic)) idt$model$bic = function(m) BIC(m)
-
-            data.frame(
-                window = idt$windowtype,
-                model = idt$model$name,
-                train_from = idt$train_from,
-                train_thru = idt$train_thru,
-                test_from = idt$test_from,
-                test_thru = idt$test_thru,
-                bic = idt$model$bic(im), # more consinstenlty implemented than AICc,
-                forecast_horizon = 1:h,
-                forecasterr = as.numeric(idt$model$forecast(m = im, h = h, xreg = idt$xreg, y = idt$train)) - idt$test,
-                forecast = list(as.numeric(idt$model$forecast(m = im, h = h, xreg = idt$xreg, y = idt$train))),
-                test = list(idt$test),
-                modelerr = as.numeric(tail(idt$model$residuals(im), h))
-            )        
-
+    
+    # make sure each of the models can be run.    
+    for(i in 1:length(models)) if(is.null(models[[i]]$enabled) || models[[i]]$enabled){
+        if(verbose) cat('\n Checking ', models[[i]]$name)
+        # find the last CV datset that has this model.
+        for(j in length(dt):1) if(dt[[j]]$model == models[[i]]$name) break
+        # run the CV function on that data and model.
+        dofn(dt[[j]])
     }
 
     # run the CVs in parallel.
-    if(verbose) cat(glue('Running {length(dt)} CV models \n'))
+    if(verbose) cat(glue('\n Running {length(dt)} CV models \n'))
     if(is.null(numcores) || numcores == 1){
         # if 1 core, just use lapply for easier troubleshooting.
         results = lapply(dt, dofn)
     } else {
-        cat('\t in parallel')
+        if(verbose) cat('\t in parallel')
         cl = makeSOCKcluster(numcores)
         registerDoSNOW(cl)
         results = tryCatch({
